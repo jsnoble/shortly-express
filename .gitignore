@@ -9,3 +9,5 @@ node_modules
 .flooignore
 
 .idea
+
+app/auth/config.js
