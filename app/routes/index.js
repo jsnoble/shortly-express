@@ -2,6 +2,9 @@ var express = require('express');
 var router = express.Router();
 var util = require('../../lib/utility');
 var bcrypt = require('bcrypt-nodejs');
+var passport = require('passport');
+
+require('../auth/strategies')(passport);
 
 var db = require('../config');
 var Users = require('../collections/users');
@@ -10,14 +13,55 @@ var Links = require('../collections/links');
 var Link = require('../models/link');
 var Click = require('../models/click');
 
-function checkUser(req, res, next) {
-  if (req.session.user) {
-    next();
-  } else {
-    req.session.error = 'Access denied!';
-    res.redirect('/login');
-  }
-}
+
+/************************************************************/
+// Write your authentication routes here
+/************************************************************/
+
+router.get('/auth/github', passport.authenticate('github', { scope: ['profile', 'email', 'name'] }));
+
+router.get('/auth/github/callback', passport.authenticate('github', { failureRedirect: '/login', successRedirect: '/' }));
+
+//todo
+router.get('/signup', function(req, res){
+  res.render('signup')
+});
+
+router.post('/signup', function(req, res){
+
+  var userObj = {
+    username: req.body.username,
+    password: req.body.password
+  };
+
+
+  util.hashPassword(userObj.password, function(hash){
+    new User({username: userObj.username, password: hash})
+      .save()
+      .then(function(newUser){
+        Users.add(newUser);
+        req.session.regenerate(function() {
+          req.session.user = userObj.username;
+          res.redirect('/');
+        });
+      });
+  });
+
+});
+
+router.get('/login', function(req, res){
+  res.render('login');
+});
+
+router.get('/logout', function(req,res) {
+  //req.session.destroy(function(err) {
+  //  if (err) throw err;
+  //  res.redirect('/login');
+  //});
+  req.logout();
+  res.redirect('/login');
+});
+
 
 router.get('/', checkUser,
   function(req, res) {
@@ -71,78 +115,6 @@ router.post('/links', checkUser,
   });
 
 /************************************************************/
-// Write your authentication routes here
-/************************************************************/
-//todo
-router.get('/signup', function(req, res){
-  res.render('signup')
-});
-
-router.post('/signup', function(req, res){
-
-  var userObj = {
-    username: req.body.username,
-    password: req.body.password
-  };
-
-
-  util.hashPassword(userObj.password, function(hash){
-    new User({username: userObj.username, password: hash})
-      .save()
-      .then(function(newUser){
-        Users.add(newUser);
-        req.session.regenerate(function() {
-          req.session.user = userObj.username;
-          res.redirect('/');
-        });
-      });
-  });
-
-});
-
-router.get('/login', function(req, res){
-  res.render('login');
-});
-
- router.post('/login', function(req, res){
-
-   var userObj = {
-     username: req.body.username,
-     password: req.body.password
-   };
-
-   new User({username: req.body.username}).fetch()
-     .then(function(user) {
-       var hashedPassword = user.get('password');
-       bcrypt.compare(userObj.password, hashedPassword, function(err, isUser){
-         if (err) throw err;
-              //need to redirect to make account
-        if (isUser) {
-           req.session.regenerate(function() {
-             var username = user.get('username');
-             req.session.user = username;
-             res.redirect('/');
-           });
-         } else {
-           res.redirect('/signup');
-         }
-       })
-     });
-   //validate inputs
-     //if exists in DB return session (token or whatever)
-        //redirect to index
-     //else redirect to signup TODO: make them visually distinctive, they look to much the same, need button
-
- });
-
-router.get('/logout', function(req,res) {
-  req.session.destroy(function(err) {
-    if (err) throw err;
-    res.redirect('/login');
-  });
-});
-
-/************************************************************/
 // Handle the wildcard route last - if all other routes fail
 // assume the route is a short code and try and handle it here.
 // If the short-code doesn't exist, send the user to '/'
@@ -169,5 +141,15 @@ router.get('/*', function(req, res) {
     }
   });
 });
+
+function checkUser(req, res, next) {
+  if (req.isAuthenticated()) {
+    return next();
+  } else {
+    //req.session.error = 'Access denied!';
+    res.redirect('/login');
+  }
+}
+
 
 module.exports = router;
