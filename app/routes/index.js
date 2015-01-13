@@ -116,7 +116,7 @@ router.get('/login', function(req, res){
        var hashedPassword = user.get('password');
        bcrypt.compare(userObj.password, hashedPassword, function(err, isUser){
          if (err) throw err;
-
+              //need to redirect to make account
         if (isUser) {
            req.session.regenerate(function() {
              var username = user.get('username');
@@ -134,6 +134,13 @@ router.get('/login', function(req, res){
      //else redirect to signup TODO: make them visually distinctive, they look to much the same, need button
 
  });
+
+router.get('/logout', function(req,res) {
+  req.session.destroy(function(err) {
+    if (err) throw err;
+    res.redirect('/login');
+  });
+});
 
 /************************************************************/
 // Handle the wildcard route last - if all other routes fail
